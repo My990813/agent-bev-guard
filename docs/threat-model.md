@@ -1,9 +1,10 @@
-# Agent BEV Guard — 威胁模型（v0.2）
+# Agent BEV Guard — 威胁模型（v0.3）
 
-## 0. 系统 claim（v0.2 修订）
+## 0. 系统 claim（v0.2 修订；v0.3 追加 Step 6 边界，见第 12 节）
 
 > **我们检测并重建 Agent 的未授权数据流。**
 > 我们不承诺"防止泄露"，不承诺杜绝一切外传。
+> 我们发现和重建行为，不判断主观意图、法律责任或违法性。
 
 ```
 Covered:
@@ -148,3 +149,46 @@ coding/data Agent。它会读写文件、调用工具、访问网络。
 > Finding = 某条规则发现了什么；Evidence = 为什么这么判断；
 > Incident = 哪些 findings 属于同一次调查事件。三者严格分开。
 > 报告 CLI 在生成前先验证审计日志哈希链，链断则拒绝出报告。
+
+## 12. Step 6 定位（2026-09-26 重新定义）
+
+**研究问题不是"发现未知攻击"，而是：**
+
+> 发现无法由既有行为基线解释的异常 Agent execution，
+> 并提供可审计的证据链供进一步调查。
+
+（Agent Behavioral Anomaly Detection + Evidence-Based
+Investigation Support，即 triage / investigation support system。）
+
+**系统边界（核心原则，永久锁定）：**
+
+> The system detects and reconstructs behavior; it does not
+> determine intent, legality, or culpability.
+> （系统负责发现和重建行为，不负责判断主观意图、法律责任或违法性。）
+
+分层职责，中间步骤不得自动跳过：
+
+```text
+机器：What happened?            （telemetry 重建 —— Step 1-5）
+机器：How unusual was it?       （基线偏离 —— Step 6）
+机器：What evidence supports?   （证据链 —— Step 5/6）
+人：  Was it authorized?        （授权判断 —— 人工调查）
+人：  Was it harmful?           （危害判断 —— 人工调查）
+法律体系：Legal consequences?   （违法性 —— 超出系统范围）
+```
+
+**具体设计约束：**
+
+- 系统输出 `behavior = unusual / inconsistent_with_baseline`，
+  永不输出 `malicious = true`。
+- 每条 triage 项固定携带 `legal_status = NOT_DETERMINED`。
+- `policy_violation` 字段只能来自 Step 5 已知规则的裁决结果；
+  无规则触发时写 UNKNOWN（"没有已知规则命中"≠"合规"），
+  永不写 "compliant / none"。
+- 异常分值是启发式排序辅助（heuristic ranking aid），
+  不是概率，不是 calibrated 阈值——与 R19 同一语义。
+- Step 6 的价值是压缩调查面：10,000 runs → N 个"请调查"，
+  由人决定是否授权、是否有害、是否涉及法律。
+- 合法通道滥用（读取 customer.csv 上传到授权 S3）在基线内
+  完全可能"不异常"——异常检测不覆盖授权问题，与第 8 节
+  out-of-scope 声明一致。

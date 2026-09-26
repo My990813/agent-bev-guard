@@ -57,7 +57,7 @@ Agent 自报："没有上传任何文件"
 | 3 | 主机传感器（bpftrace 探针 + 归一化器，Linux VM） | done |
 | 4 | 实体解析 + 时钟对齐（融合层） | done |
 | 5 | Provenance 图 + 一致性规则（part A：图+规则引擎；part B：incident 聚合+报告 CLI） | done |
-| 6 | 统计异常检测 + 事件重建 | todo |
+| 6 | 行为异常检测 + 调查 triage（基线偏离，不判定恶意/违法） | done |
 
 ## 布局
 
@@ -78,6 +78,10 @@ core/rules.py            一致性规则引擎：R1 机密文件→外发 / R2 �
                          （R21：(pid, pid_start_ts) 归因，pid 单独永不参与自动因果归属）
 core/report.py           报告层：incident 聚合（union-find，只归组不修改 findings）+ 文本/JSON 渲染
 report_cli.py            报告 CLI：哈希链验证 → 规则引擎 → incident 聚合 → report.json/.txt/graph.txt
+core/baseline.py         行为基线：per-run 特征提取 + 稳健统计（median/MAD）+ 新颖性集合（端点/工具序列）
+core/anomaly.py          异常评分 + triage：基线偏离 flags（robust_z / 常数基线 / 新端点 / 新工具序列）
+                         + Step 5 已知规则 policy_status + legal_status=NOT_DETERMINED（永久）
+triage_cli.py            triage CLI：双日志哈希链验证 → 基线 → 评分 → triage_report.txt/.json
 docs/vm-setup.md         Linux VM 部署指南（OrbStack/UTM）
 examples/                示例事件、示例策略、路径分级映射、规则配置、demo 日志与报告
 tests/                   每步的 sanity 测试（含端到端 stdio 会话与 CLI 篡改检测）
@@ -91,6 +95,7 @@ python tests/test_sensors.py    # step 3（归一化器，macOS 可跑）
 python tests/test_fusion.py     # step 4（融合层 + telemetry + 容差模型）
 python tests/test_rules.py      # step 5A（provenance 图 + 规则引擎）
 python tests/test_report.py     # step 5B（incident 聚合 + 报告 + CLI 篡改检测）
+python tests/test_triage.py     # step 6（基线 + 异常评分 + triage 语义）
 ```
 
 一键复现 demo 报告（原始场景：机密图片被读 → 2.3MB 外发 → agent 自称"没上传"）：
@@ -99,6 +104,17 @@ python tests/test_report.py     # step 5B（incident 聚合 + 报告 + CLI 篡�
 python examples/make_demo_log.py examples/demo_events.jsonl
 python report_cli.py --log examples/demo_events.jsonl \
     --config examples/rules_config.json --out examples/demo_report
+```
+
+一键复现 triage demo（30 run 基线 → 25 run 目标日 → 2 个"请调查"，
+含 HIGH/MEDIUM 分级与 policy/legal 状态分离）：
+
+```
+python examples/make_triage_demo.py examples/triage_baseline.jsonl \
+    examples/triage_target.jsonl
+python triage_cli.py --baseline examples/triage_baseline.jsonl \
+    --log examples/triage_target.jsonl \
+    --config examples/rules_config.json --out examples/demo_triage
 ```
 
 内核探针在 Linux VM 内运行，见 `docs/vm-setup.md`。
@@ -114,7 +130,7 @@ python gateway/proxy.py \
 
 零第三方依赖，Python 3.10+。
 
-## 固定设计原则（2026-09-26 两轮裁决）
+## 固定设计原则（2026-09-26 六轮裁决，R1–R24 + Step 6 定位）
 
 1. `ts_mono` 只做单机排序，不跨机器使用（MVP 锁定单机/单 VM）。
 2. `agent_run_id` 可为空；推断身份必须带 `identity_source` 与 confidence，
@@ -142,3 +158,9 @@ python gateway/proxy.py \
     unavailable），删失文件不补估计值，对账结论为 INSUFFICIENT_EVIDENCE。
 15. 规则窗口默认 600s、可配置，且每条 finding 记录实际使用的窗口值，
     保证不同窗口的实验可复现。
+16. **系统发现和重建行为，不判断主观意图、法律责任或违法性**
+    （Step 6 永久边界）：异常输出是 `inconsistent_with_baseline`，
+    永不是 `malicious`；每条 triage 项固定 `legal_status=NOT_DETERMINED`；
+    `policy_violation` 只来自已知规则裁决，无规则命中记 UNKNOWN
+    （"没命中"≠"合规"）；Step 6 的价值是把 10,000 runs 压缩成
+    N 个"请调查"，授权/危害/违法由人判断。
