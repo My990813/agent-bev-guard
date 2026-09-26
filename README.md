@@ -4,6 +4,50 @@ Agent 行为的多源证据融合监控（observability + forensics）。
 把内核态传感器、工具网关、Agent 自报日志统一到一个事件 schema，
 在带外 append-only 审计日志上做跨源一致性检测。
 
+> **[🌐 交互式 Demo](https://my990813.github.io/agent-bev-guard/)** —— 
+> 机密文件被读 → 2.3MB 外发 → Agent 自称"没上传"：看三条独立证据源
+> 如何在 provenance 图上对齐成一条告警链，并动手改条件
+> （加白名单 / 传感器降级 / 篡改日志）看规则怎么响应。
+
+## 30 秒快速开始
+
+```bash
+git clone https://github.com/My990813/agent-bev-guard.git
+cd agent-bev-guard
+
+# 1. 跑全部测试（六步，零第三方依赖，Python 3.10+）
+for t in tests/test_*.py; do python3 "$t"; done
+
+# 2. 复现 demo 报告：原始场景 → 3 findings → 1 incident
+python3 examples/make_demo_log.py /tmp/events.jsonl
+python3 report_cli.py --log /tmp/events.jsonl \
+    --config examples/rules_config.json --out /tmp/report
+
+cat /tmp/report/report.txt   # 结构化告警（rule/violation/lineage/confidence/conclusion）
+cat /tmp/report/graph.txt    # provenance 图的文本渲染
+```
+
+把真实 Agent 接到网关后面、在 Linux VM 里跑内核传感器：
+见 [docs/vm-setup.md](docs/vm-setup.md)。
+
+## 它解决什么问题
+
+Agent 框架的可观测工具（LangSmith / Langfuse / OTel GenAI）全是
+**Agent 自报**的——被 compromise 或被 prompt injection 的 Agent 可以
+改自己的日志。本项目的核心主张：**把 Agent 自报行为与系统级
+ground truth 放在同一张 provenance 图上做跨源矛盾检测**——
+
+```
+Agent 自报："没有上传任何文件"
+内核观测：  读 image_123.jpg → 向白名单外地址发送 2.3MB
+                 ↓ 跨源矛盾本身即告警
+网关观测：  这次 run 归属、调用过哪些工具
+```
+
+采集在内核态（bpftrace/eBPF，Agent 进程无权修改）、存储带外
+（append-only + SHA-256 哈希链，篡改可定位到具体记录）、
+报告前先验链（链断拒绝出报告）。
+
 ## 路线图
 
 | 步骤 | 内容 | 状态 |
@@ -18,6 +62,7 @@ Agent 行为的多源证据融合监控（observability + forensics）。
 ## 布局
 
 ```
+docs/index.html          交互式网页 Demo（GitHub Pages）
 docs/threat-model.md     威胁模型 v0.2（含五项裁决记录与三条固定原则）
 schema/event.schema.json 统一事件 JSON Schema
 core/events.py           Event 模型 + append-only 哈希链日志 + 身份来源标记

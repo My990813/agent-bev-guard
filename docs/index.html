@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent BEV Guard — 交互式 Demo</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d;
+    --fg: #e6edf3; --dim: #8b949e; --accent: #58a6ff;
+    --red: #f85149; --green: #3fb950; --yellow: #d29922; --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.65; padding-bottom: 80px;
+  }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 24px; }
+  header {
+    border-bottom: 1px solid var(--border); padding: 48px 0 32px;
+    background: linear-gradient(180deg, #10161f 0%, var(--bg) 100%);
+  }
+  header h1 { font-size: 28px; letter-spacing: .5px; }
+  header h1 .accent { color: var(--accent); }
+  header p.tagline { color: var(--dim); margin-top: 8px; font-size: 15px; }
+  header .badges { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .badge {
+    font-size: 12px; border: 1px solid var(--border); border-radius: 999px;
+    padding: 2px 10px; color: var(--dim);
+  }
+  section { margin-top: 56px; }
+  h2 { font-size: 20px; padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  h2 .n { color: var(--accent); margin-right: 8px; font-family: ui-monospace, monospace; }
+  .note { color: var(--dim); font-size: 13px; margin-bottom: 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+
+  /* scenario strip */
+  .scenario { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; }
+  .sc-step { flex: 1; min-width: 200px; padding: 16px; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--panel); position: relative; }
+  .sc-step + .sc-step { margin-left: 28px; }
+  .sc-step + .sc-step::before {
+    content: "→"; position: absolute; left: -24px; top: 50%; transform: translateY(-50%);
+    color: var(--dim); font-size: 18px;
+  }
+  .sc-step .t { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+  .sc-step .d { margin-top: 6px; font-size: 14px; }
+  .sc-step.bad { border-color: rgba(248,81,73,.4); }
+  .sc-step.bad .t { color: var(--red); }
+
+  /* sensor columns */
+  .sensors { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .sensor h3 { font-size: 14px; margin-bottom: 4px; }
+  .sensor .priv { font-size: 11px; padding: 1px 8px; border-radius: 999px; display: inline-block; margin-bottom: 12px; }
+  .priv.kernel { color: var(--green); border: 1px solid rgba(63,185,80,.4); }
+  .priv.gateway { color: var(--accent); border: 1px solid rgba(88,166,255,.4); }
+  .priv.untrusted { color: var(--yellow); border: 1px solid rgba(210,153,34,.4); }
+  .ev {
+    font-size: 12.5px; padding: 8px 10px; border-left: 2px solid var(--border);
+    margin-bottom: 8px; background: rgba(255,255,255,.02); border-radius: 0 4px 4px 0;
+  }
+  .ev .ts { color: var(--dim); }
+  .ev .et { color: var(--fg); font-weight: 600; }
+  .ev .meta { color: var(--dim); }
+  .ev.clickable { cursor: pointer; }
+  .ev.clickable:hover { background: rgba(88,166,255,.08); border-left-color: var(--accent); }
+  .ev.selected { background: rgba(88,166,255,.12); border-left-color: var(--accent); }
+  .ev.flag { border-left-color: var(--red); }
+
+  /* timeline */
+  .timeline svg { width: 100%; height: auto; }
+
+  /* graph */
+  .graph svg { width: 100%; height: auto; }
+  .graph .node { cursor: pointer; }
+  .graph .node rect { fill: var(--panel); stroke: var(--border); rx: 6; }
+  .graph .node:hover rect { stroke: var(--accent); }
+  .graph .node text { fill: var(--fg); font-size: 12px; }
+  .graph .node .kind { fill: var(--dim); font-size: 10px; }
+  .graph .edge-label { fill: var(--dim); font-size: 10px; font-family: ui-monospace, monospace; }
+  .graph .edge path { stroke: #3d4650; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+  .graph .edge.dim { opacity: .25; }
+  .graph .edge.hl path { stroke: var(--red); stroke-width: 2; }
+  .graph .edge.hl .edge-label { fill: var(--red); }
+
+  /* findings */
+  .finding { border: 1px solid var(--border); border-radius: 8px; background: var(--panel);
+    padding: 18px; margin-bottom: 16px; }
+  .finding.alert { border-color: rgba(248,81,73,.45); }
+  .finding.faded { opacity: .55; }
+  .finding h3 { font-size: 15px; margin-bottom: 12px; }
+  .finding h3 .rule { color: var(--accent); }
+  .kv { display: grid; grid-template-columns: 130px 1fr; gap: 4px 12px; font-size: 13px; }
+  .kv .k { color: var(--dim); }
+  .kv .v { word-break: break-all; }
+  .conclusion {
+    margin-top: 12px; padding: 8px 12px; border-radius: 6px; font-weight: 600;
+    font-size: 13.5px; display: inline-block;
+  }
+  .conclusion.alert { background: rgba(248,81,73,.12); color: var(--red); border: 1px solid rgba(248,81,73,.4); }
+  .conclusion.ok { background: rgba(63,185,80,.1); color: var(--green); border: 1px solid rgba(63,185,80,.35); }
+  .conclusion.na { background: rgba(139,148,158,.1); color: var(--dim); border: 1px solid var(--border); }
+  .chip { font-size: 11px; padding: 1px 8px; border-radius: 999px; margin-right: 6px; display: inline-block; }
+  .chip.conf { color: var(--purple); border: 1px solid rgba(188,140,255,.4); }
+  .chip.health-ok { color: var(--green); border: 1px solid rgba(63,185,80,.4); }
+  .chip.health-bad { color: var(--red); border: 1px solid rgba(248,81,73,.4); }
+
+  /* controls */
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .ctl { border: 1px solid var(--border); border-radius: 8px; padding: 14px; background: var(--panel); }
+  .ctl label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; }
+  .ctl .hint { font-size: 12px; color: var(--dim); margin-top: 6px; }
+  .switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: #21262d; border: 1px solid var(--border);
+    border-radius: 999px; transition: .2s; }
+  .slider::before { content: ""; position: absolute; width: 14px; height: 14px; left: 2px; top: 2px;
+    background: var(--dim); border-radius: 50%; transition: .2s; }
+  .switch input:checked + .slider { background: rgba(88,166,255,.25); border-color: var(--accent); }
+  .switch input:checked + .slider::before { transform: translateX(16px); background: var(--accent); }
+
+  /* hash chain */
+  .chain { display: flex; gap: 0; overflow-x: auto; padding: 8px 0; }
+  .blk { min-width: 120px; border: 1px solid var(--border); border-radius: 6px; padding: 10px;
+    background: var(--panel); font-size: 11px; flex-shrink: 0; }
+  .blk + .blk { margin-left: 20px; position: relative; }
+  .blk + .blk::before { content: "⛓"; position: absolute; left: -18px; top: 40%; color: var(--green); }
+  .blk .seq { color: var(--accent); font-weight: 700; }
+  .blk .h { color: var(--dim); word-break: break-all; margin-top: 4px; }
+  .blk.broken { border-color: var(--red); background: rgba(248,81,73,.08); }
+  .blk.broken + .blk::before, .blk.broken::before { content: "✕"; color: var(--red); }
+  .tamper-banner {
+    display: none; margin-top: 12px; padding: 10px 14px; border-radius: 6px;
+    background: rgba(248,81,73,.12); border: 1px solid rgba(248,81,73,.45);
+    color: var(--red); font-size: 13.5px; font-weight: 600;
+  }
+  .tamper-banner.show { display: block; }
+
+  footer { margin-top: 72px; border-top: 1px solid var(--border); padding-top: 28px; }
+  .principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .pr { border: 1px solid var(--border); border-radius: 8px; padding: 14px; background: var(--panel); }
+  .pr .t { color: var(--accent); font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .pr .d { color: var(--dim); font-size: 12.5px; }
+  footer .repo { margin-top: 24px; color: var(--dim); font-size: 13px; }
+  footer .repo a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>Agent <span class="accent">BEV</span> Guard</h1>
+    <p class="tagline">多源证据融合的 Agent 行为取证 —— 检测并重建 Agent 的未授权数据流</p>
+    <div class="badges">
+      <span class="badge mono">kernel sensors (eBPF/bpftrace)</span>
+      <span class="badge mono">MCP tool gateway</span>
+      <span class="badge mono">hash-chained audit log</span>
+      <span class="badge mono">provenance graph + consistency rules</span>
+      <span class="badge mono">zero deps · Python 3.10+</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<section>
+  <h2><span class="n">01</span>场景</h2>
+  <p class="note">一次 Agent 会话中发生的三件事——单独看每件都不一定致命，放在一起就是一条证据链：</p>
+  <div class="scenario">
+    <div class="sc-step">
+      <div class="t">14:03:24 · 内核观测</div>
+      <div class="d">进程 4242 读取机密文件<br><span class="mono" style="color:var(--purple)">/home/Docs/image_123.jpg</span>（confidential）</div>
+    </div>
+    <div class="sc-step">
+      <div class="t">14:03:25 · 内核观测</div>
+      <div class="d">连接白名单外地址<br><span class="mono" style="color:var(--purple)">203.0.113.7:443</span>，发送 2.3 MB</div>
+    </div>
+    <div class="sc-step bad">
+      <div class="t">14:03:26 · Agent 自报</div>
+      <div class="d">「我没有上传任何文件」<br><span style="color:var(--dim);font-size:13px">——与系统观测矛盾</span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">02</span>三个独立证据源，统一进一条哈希链审计日志</h2>
+  <p class="note">每个传感器有不同的权限层级（sensor_privilege）与身份确定度（identity_source）。点击事件可在下方的图里高亮它对应的边。</p>
+  <div class="sensors">
+    <div class="sensor panel">
+      <h3>tool_gateway</h3>
+      <span class="priv gateway">privilege: gateway</span>
+      <div class="ev clickable" data-edge="session">
+        <span class="ts mono">t=1000</span> <span class="et mono">gateway.session_start</span><br>
+        <span class="meta mono">run-abc · client_pid=4242 (observed_ppid) · identity=DIRECT</span>
+      </div>
+      <div class="ev" data-edge="">
+        <span class="ts mono">t=1100</span> <span class="et mono">gateway.session_end</span><br>
+        <span class="meta mono">run_id: gateway_issued, verified=false（关联句柄，非认证）</span>
+      </div>
+    </div>
+    <div class="sensor panel">
+      <h3>file / network</h3>
+      <span class="priv kernel">privilege: kernel</span>
+      <div class="ev clickable flag" data-edge="read">
+        <span class="ts mono">t=1050</span> <span class="et mono">file.open</span><br>
+        <span class="meta mono">read · /home/Docs/image_123.jpg [confidential]</span>
+      </div>
+      <div class="ev clickable flag" data-edge="connect">
+        <span class="ts mono">t=1051</span> <span class="et mono">net.connect</span><br>
+        <span class="meta mono">→ 203.0.113.7:443（白名单外）</span>
+      </div>
+      <div class="ev clickable flag" data-edge="send">
+        <span class="ts mono">t=1052</span> <span class="et mono">net.egress</span><br>
+        <span class="meta mono">send · 2,300,000 bytes · identity=INFERRED (0.90)</span>
+      </div>
+    </div>
+    <div class="sensor panel">
+      <h3>agent_self</h3>
+      <span class="priv untrusted">privilege: untrusted</span>
+      <div class="ev clickable flag" data-edge="claim">
+        <span class="ts mono">t=1053</span> <span class="et mono">agent.claim</span><br>
+        <span class="meta mono">"no files were uploaded" · 只采信、必核对</span>
+      </div>
+      <div class="ev" data-edge="">
+        <span class="ts mono">t=1200</span> <span class="et mono">sensor.health</span><br>
+        <span class="meta mono">HEALTHY · loss_ratio=0（必要非充分信号）</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">03</span>Provenance 图：谁碰了什么</h2>
+  <p class="note">节点 = run / 进程 / 文件 / 端点 / 声明；每条边标注来源传感器与身份确定度。红色边构成告警的证据链。</p>
+  <div class="graph panel">
+    <svg viewBox="0 0 1000 380" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#3d4650"/>
+        </marker>
+        <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#f85149"/>
+        </marker>
+      </defs>
+      <!-- run node -->
+      <g class="node" transform="translate(60,150)">
+        <rect width="150" height="58" rx="6"/>
+        <text x="75" y="24" text-anchor="middle" class="mono">run-abc</text>
+        <text x="75" y="42" text-anchor="middle" class="kind">agent run</text>
+      </g>
+      <!-- agent process -->
+      <g class="node" transform="translate(330,150)">
+        <rect width="150" height="58" rx="6"/>
+        <text x="75" y="24" text-anchor="middle" class="mono">pid 4242</text>
+        <text x="75" y="42" text-anchor="middle" class="kind">process (start_ts=900)</text>
+      </g>
+      <!-- file -->
+      <g class="node" transform="translate(620,30)">
+        <rect width="230" height="58" rx="6" style="stroke:rgba(188,140,255,.5)"/>
+        <text x="115" y="24" text-anchor="middle" class="mono" style="fill:#bc8cff">image_123.jpg</text>
+        <text x="115" y="42" text-anchor="middle" class="kind">file [confidential]</text>
+      </g>
+      <!-- endpoint -->
+      <g class="node" transform="translate(620,150)">
+        <rect width="230" height="58" rx="6" style="stroke:rgba(248,81,73,.5)"/>
+        <text x="115" y="24" text-anchor="middle" class="mono" style="fill:#f85149" id="endpoint-label">203.0.113.7:443</text>
+        <text x="115" y="42" text-anchor="middle" class="kind" id="endpoint-kind">endpoint · non-allowlisted</text>
+      </g>
+      <!-- claim -->
+      <g class="node" transform="translate(620,270)">
+        <rect width="230" height="58" rx="6"/>
+        <text x="115" y="24" text-anchor="middle" class="mono">claim:no_upload</text>
+        <text x="115" y="42" text-anchor="middle" class="kind">agent self-report (untrusted)</text>
+      </g>
+      <!-- edges -->
+      <g class="edge" id="edge-session"><path d="M135,150 L210,179"/><text class="edge-label" x="150" y="152">run_of</text></g>
+      <g class="edge" id="edge-read"><path d="M405,150 L620,70"/><text class="edge-label" x="470" y="105">read · file/kernel</text></g>
+      <g class="edge" id="edge-connect"><path d="M480,179 L620,179"/><text class="edge-label" x="500" y="170">connect · net/kernel</text></g>
+      <g class="edge" id="edge-send"><path d="M480,190 L620,192"/><text class="edge-label" x="505" y="208">send · 2.3MB</text></g>
+      <g class="edge" id="edge-claim"><path d="M405,208 L620,292"/><text class="edge-label" x="470" y="270">claim · self/untrusted</text></g>
+    </svg>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">04</span>一致性规则 → 结构化结论</h2>
+  <p class="note">告警由「规则是否成立」决定；confidence 只描述证据强弱（heuristic score，非概率）；sensor health 只描述观测完整性。三者不混成一个分数，也没有单一 risk_score。</p>
+  <div id="findings"></div>
+</section>
+
+<section>
+  <h2><span class="n">05</span>改改条件试试：规则怎么响应</h2>
+  <div class="controls">
+    <div class="ctl">
+      <label>
+        <span class="switch"><input type="checkbox" id="ctl-allowlist"><span class="slider"></span></span>
+        把 203.0.113.7 加进白名单
+      </label>
+      <div class="hint">规则一、三豁免——但规则二照样响：说了没发就是发了，发去哪都算矛盾。</div>
+    </div>
+    <div class="ctl">
+      <label>
+        <span class="switch"><input type="checkbox" id="ctl-health"><span class="slider"></span></span>
+        传感器降级（DEGRADED）
+      </label>
+      <div class="hint">证据不齐时，"没发现问题"自动变成"无法下结论"——absence of evidence ≠ evidence of absence。</div>
+    </div>
+    <div class="ctl">
+      <label>
+        <span class="switch"><input type="checkbox" id="ctl-noclaim"><span class="slider"></span></span>
+        Agent 没有做任何声明
+      </label>
+      <div class="hint">规则二输出 NOT_APPLICABLE（不适用），而不是"没违规"——两码事。</div>
+    </div>
+    <div class="ctl">
+      <label>
+        <span class="switch"><input type="checkbox" id="ctl-tamper"><span class="slider"></span></span>
+        篡改审计日志（改 egress 字节数）
+      </label>
+      <div class="hint">哈希链断裂被定位到具体记录，报告 CLI 拒绝出报告。</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">06</span>审计日志：append-only + 哈希链</h2>
+  <p class="note">每条记录的 hash = SHA-256(上一条 hash + 本条内容)。改任何一条、删一行、插一行，链都会断在具体位置。</p>
+  <div class="chain" id="chain"></div>
+  <div class="tamper-banner" id="tamper-banner">
+    ⛔ 哈希链在记录 #4 处断裂 —— egress bytes 被篡改（2,300,000 → 9,999,999）。报告 CLI 拒绝基于被污染的证据出报告（exit 3）。
+  </div>
+</section>
+
+<footer>
+  <h2 style="border:none;margin-bottom:16px">固定设计原则</h2>
+  <div class="principles">
+    <div class="pr"><div class="t">不存 payload</div><div class="d">审计日志只有行为 metadata（路径/字节数/动词），日志本身不能成为泄露通道。</div></div>
+    <div class="pr"><div class="t">允许不确定，不伪造确定性</div><div class="d">每条事件有明确的 identity 状态（DIRECT/INFERRED/UNKNOWN），而不是必须有 identity。</div></div>
+    <div class="pr"><div class="t">pid 单独永不归因</div><div class="d">因果归因键是 (pid, pid_start_ts)；宁可 UNKNOWN，不制造假的因果链。</div></div>
+    <div class="pr"><div class="t">缺证据 ≠ 没发生</div><div class="d">不知道文件大小时对账结论是 INSUFFICIENT_EVIDENCE；传感器降级时阴性结论变成 INCONCLUSIVE。</div></div>
+    <div class="pr"><div class="t">引擎不聚合</div><div class="d">规则引擎只产原始 findings，incident 归组只在报告层——"触发三次"与"压成一次"永远可区分。</div></div>
+    <div class="pr"><div class="t">先验链，后出报告</div><div class="d">报告生成前先验证审计日志哈希链，链断则拒绝出报告。</div></div>
+  </div>
+  <p class="repo">源码与完整文档：<a href="https://github.com/My990813/agent-bev-guard">github.com/My990813/agent-bev-guard</a></p>
+</footer>
+
+</div>
+
+<script>
+// ---- state ----
+const state = { allowlist: false, degraded: false, noclaim: false, tamper: false };
+
+const FINDING_TPL = (rule, label, opts) => {
+  const cls = opts.conclusion.startsWith("ALERT") ? "alert"
+            : opts.conclusion === "NOT_APPLICABLE" ? "na" : "ok";
+  const faded = cls !== "alert" ? "faded" : "";
+  return `
+  <div class="finding ${cls} ${faded}">
+    <h3><span class="rule mono">${rule}</span> — ${label}</h3>
+    <div class="kv">
+      <div class="k">Violation</div><div class="v">${opts.violation ? '<span style="color:var(--red);font-weight:700">YES</span>' : "NO"}</div>
+      <div class="k">Lineage</div><div class="v mono">${opts.lineage}</div>
+      <div class="k">Confidence</div><div class="v"><span class="chip conf mono">${opts.conf}</span>heuristic evidence score, NOT probability</div>
+      <div class="k">Sensor</div><div class="v"><span class="chip ${state.degraded ? "health-bad" : "health-ok"} mono">${state.degraded ? "DEGRADED" : "HEALTHY"}</span>${state.degraded ? "loss_ratio 18% · 必要非充分信号" : "loss_ratio 0 · 必要非充分信号"}</div>
+      <div class="k">Evidence</div><div class="v mono" style="font-size:12px">${opts.evidence}</div>
+      ${opts.details || ""}
+    </div>
+    <div class="conclusion ${cls} mono">${opts.conclusion}</div>
+  </div>`;
+};
+
+function renderFindings() {
+  const ep = state.allowlist ? "151.101.1.140:443" : "203.0.113.7:443";
+  const nonAllowlisted = !state.allowlist;
+
+  // Rule 1: confidential file -> external egress
+  const r1Fires = nonAllowlisted;
+  const vol = state.tamper
+    ? `observed=<span style="color:var(--red)">9,999,999</span> expected=2,300,000 tol=10% → <span style="color:var(--red)">OUT_OF_BAND（链已断，此对账不可信）</span>`
+    : `observed=2,300,000 expected=2,300,000 tol=10% → <b style="color:var(--green)">MATCH</b>`;
+  const r1 = FINDING_TPL("CONFIDENTIAL_FILE_TO_EXTERNAL_EGRESS", "机密文件访问后外发", {
+    violation: r1Fires,
+    lineage: "INFERRED",
+    conf: r1Fires ? "0.90" : "—",
+    evidence: r1Fires ? "ev-file-open-1050, ev-net-connect-1051, ev-net-egress-1052" : "—",
+    conclusion: r1Fires
+      ? (state.degraded ? "ALERT_WITH_INFERRED_LINEAGE" : "ALERT_WITH_INFERRED_LINEAGE")
+      : (state.degraded ? "INCONCLUSIVE_DUE_TO_SENSOR_LOSS" : "NO_VIOLATION"),
+    details: r1Fires ? `
+      <div class="k">file</div><div class="v mono">/home/Docs/image_123.jpg [confidential]</div>
+      <div class="k">endpoint</div><div class="v mono">${ep}</div>
+      <div class="k">bytes_sent</div><div class="v mono">2,300,000 (2.2 MB)</div>
+      <div class="k">volume</div><div class="v mono" style="font-size:12px">${vol}</div>
+      <div class="k">size_source</div><div class="v mono">config_provided</div>
+      <div class="k">window</div><div class="v mono">600s [1050 .. 1650]</div>` : `
+      <div class="k">豁免原因</div><div class="v">目的端点在 allowlist 内（${ep}）</div>`,
+  });
+
+  // Rule 2: claim contradiction
+  let r2;
+  if (state.noclaim) {
+    r2 = FINDING_TPL("AGENT_CLAIM_CONTRADICTED", "自报矛盾", {
+      violation: false, lineage: "N/A", conf: "—", evidence: "—",
+      conclusion: "NOT_APPLICABLE",
+      details: `<div class="k">原因</div><div class="v">没有可核对的自报声明（NOT_APPLICABLE ≠ 没违规）</div>`,
+    });
+  } else {
+    r2 = FINDING_TPL("AGENT_CLAIM_CONTRADICTED", "自报矛盾", {
+      violation: true, lineage: "INFERRED", conf: "0.90",
+      evidence: "claim-1, ev-net-egress-1052",
+      conclusion: "ALERT_WITH_INFERRED_LINEAGE",
+      details: `
+        <div class="k">claim</div><div class="v mono">"no files were uploaded"</div>
+        <div class="k">observed</div><div class="v mono">同 run 下实测外发 2,300,000 bytes —— 说法与观测矛盾本身即告警（不解析内容，只对账）</div>
+        <div class="k">claimant_run</div><div class="v mono">run-abc</div>`,
+    });
+  }
+
+  // Rule 3: non-allowlist egress
+  const r3Fires = nonAllowlisted;
+  const r3 = FINDING_TPL("EGRESS_TO_NON_ALLOWLIST", "白名单外连接", {
+    violation: r3Fires, lineage: r3Fires ? "INFERRED" : "N/A",
+    conf: r3Fires ? "0.90" : "—",
+    evidence: r3Fires ? "ev-net-connect-1051, ev-net-egress-1052" : "—",
+    conclusion: r3Fires ? "ALERT_WITH_INFERRED_LINEAGE"
+      : (state.degraded ? "INCONCLUSIVE_DUE_TO_SENSOR_LOSS" : "NO_VIOLATION"),
+    details: r3Fires ? `
+      <div class="k">endpoint</div><div class="v mono">${ep} · 不在 allowlist</div>
+      <div class="k">bytes_sent</div><div class="v mono">2,300,000 (2.2 MB)</div>` : `
+      <div class="k">豁免原因</div><div class="v">连接目的在 allowlist 内</div>`,
+  });
+
+  const alerts = [r1, r2, r3].filter(x => x.includes("YES")).length;
+  const header = alerts > 0
+    ? `<p class="note" style="color:var(--red);font-weight:600">${alerts} 条规则触发 · 归并为 1 个 incident（聚合只发生在报告层，原始 findings 不被修改）</p>`
+    : `<p class="note" style="color:var(--dim)">当前条件下没有规则触发。</p>`;
+  document.getElementById("findings").innerHTML = header + r1 + r2 + r3;
+}
+
+// ---- hash chain ----
+const EVENTS = [
+  { seq: 1,  et: "gateway.session_start", h: "a3f1…" },
+  { seq: 2,  et: "file.open",            h: "7c02…" },
+  { seq: 3,  et: "net.connect",          h: "e9d4…" },
+  { seq: 4,  et: "net.egress",           h: "1b8f…" },
+  { seq: 5,  et: "agent.claim",          h: "66a0…" },
+  { seq: 6,  et: "sensor.health",        h: "d41c…" },
+  { seq: 7,  et: "gateway.session_end",  h: "90f3…" },
+];
+function renderChain() {
+  const c = document.getElementById("chain");
+  c.innerHTML = EVENTS.map(e => {
+    const broken = state.tamper && e.seq === 4;
+    const h = broken ? "1b8f → <span style='color:var(--red)'>ERR</span>" : e.h;
+    const meta = e.seq === 4
+      ? (state.tamper ? "bytes=<span style='color:var(--red)'>9,999,999</span>" : "bytes=2,300,000")
+      : "";
+    return `<div class="blk ${broken ? "broken" : ""}">
+      <div class="seq mono">#${e.seq}</div>
+      <div class="mono">${e.et}</div>
+      <div class="h mono">${h} ${meta ? "<br>" + meta : ""}</div>
+    </div>`;
+  }).join("");
+  document.getElementById("tamper-banner").classList.toggle("show", state.tamper);
+}
+
+// ---- graph updates ----
+function renderGraph() {
+  const label = document.getElementById("endpoint-label");
+  const kind = document.getElementById("endpoint-kind");
+  if (state.allowlist) {
+    label.textContent = "151.101.1.140:443";
+    kind.textContent = "endpoint · allowlisted";
+    label.style.fill = ""; label.style.color = "";
+  } else {
+    label.textContent = "203.0.113.7:443";
+    kind.textContent = "endpoint · non-allowlisted";
+  }
+  // evidence-chain edges highlight when rules fire
+  const chainOn = !state.allowlist;
+  ["read", "connect", "send"].forEach(id => {
+    const el = document.getElementById("edge-" + id);
+    el.classList.toggle("hl", chainOn);
+    const path = el.querySelector("path");
+    if (chainOn) { path.setAttribute("marker-end", "url(#arrow-red)"); }
+    else { path.setAttribute("marker-end", "url(#arrow)"); }
+  });
+  document.getElementById("edge-claim").classList.toggle("hl", !state.noclaim);
+}
+
+// ---- event card click -> highlight edge ----
+document.querySelectorAll(".ev.clickable").forEach(el => {
+  el.addEventListener("click", () => {
+    document.querySelectorAll(".ev.selected").forEach(x => x.classList.remove("selected"));
+    el.classList.add("selected");
+    const id = el.dataset.edge;
+    document.querySelectorAll(".graph .edge").forEach(e => e.classList.add("dim"));
+    if (id) {
+      const target = document.getElementById("edge-" + id);
+      if (target) target.classList.remove("dim");
+    } else {
+      document.querySelectorAll(".graph .edge").forEach(e => e.classList.remove("dim"));
+    }
+  });
+});
+
+// ---- controls ----
+function bind(id, key) {
+  document.getElementById(id).addEventListener("change", e => {
+    state[key] = e.target.checked;
+    renderFindings(); renderChain(); renderGraph();
+  });
+}
+bind("ctl-allowlist", "allowlist");
+bind("ctl-health", "degraded");
+bind("ctl-noclaim", "noclaim");
+bind("ctl-tamper", "tamper");
+
+renderFindings(); renderChain(); renderGraph();
+</script>
+</body>
+</html>
