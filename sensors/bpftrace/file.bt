@@ -1,0 +1,21 @@
+#!/usr/bin/env bpftrace
+/* file sensor: record openat() results (path, flags, ret) system-wide.
+ * Output: FILE|pid|uid|nsecs|flags|ret|path
+ * flags captured at syscall enter, ret captured at exit, keyed by tid.
+ * Note: open events carry no byte counts -- read/write sizes need
+ * read()/write() tracing (see risk R15 in step-3 delivery notes).
+ */
+tracepoint:syscalls:sys_enter_openat
+{
+  @oflags[tid] = args->flags;
+  @fname[tid] = str(args->filename);
+}
+
+tracepoint:syscalls:sys_exit_openat
+/@fname[tid]/
+{
+  printf("FILE|%d|%u|%u|%d|%ld|%s\n",
+         pid, uid, nsecs, @oflags[tid], args->ret, @fname[tid]);
+  delete(@oflags[tid]);
+  delete(@fname[tid]);
+}

@@ -1,0 +1,36 @@
+{
+  "default": "allow",
+  "tools": {
+    "read_file": {
+      "allow": true,
+      "params": {
+        "path": {
+          "type": "path_within",
+          "roots": ["/Users/mengyan/work"]
+        }
+      }
+    },
+    "write_file": {
+      "allow": true,
+      "params": {
+        "path": {
+          "type": "path_within",
+          "roots": ["/Users/mengyan/work"]
+        }
+      }
+    },
+    "web_search": {
+      "allow": true,
+      "params": {
+        "query": {
+          "type": "string",
+          "max_len": 2000,
+          "forbidden_substrings": ["BEGIN RSA PRIVATE KEY", "api_key="]
+        }
+      }
+    },
+    "exec_shell": {
+      "allow": false
+    }
+  }
+}

@@ -1,0 +1,24 @@
+#!/usr/bin/env bpftrace
+/* network sensor: TCP connection establishment + per-send egress volume.
+ * Output on connect:  CONNECT|pid|nsecs|saddr|daddr|dport
+ * Output on send:     SEND|pid|nsecs|bytes
+ *
+ * Uses tracepoint:sock:inet_sock_set_state (newstate == TCP_ESTABLISHED)
+ * so destination addresses are read from kernel memory -- no user-pointer
+ * dereference needed. Caveat: on passively-accepted sockets the pid is
+ * the kernel task, not the owning process (risk R16).
+ *
+ * dport in this tracepoint is in network byte order on most kernels;
+ * the normalizer applies the port swap based on the --bswap-port flag.
+ */
+tracepoint:sock:inet_sock_set_state
+/args->protocol == 6 && args->newstate == 1/
+{
+  printf("CONNECT|%d|%u|%s|%s|%u\n",
+         pid, nsecs, ntop(args->saddr), ntop(args->daddr), args->dport);
+}
+
+kprobe:tcp_sendmsg
+{
+  printf("SEND|%d|%u|%u\n", pid, nsecs, (uint64)arg1);
+}

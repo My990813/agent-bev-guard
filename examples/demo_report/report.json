@@ -1,0 +1,109 @@
+{
+  "generated_at": "2026-09-26T07:33:36.613045+00:00",
+  "log_path": "examples/demo_events.jsonl",
+  "event_count": 7,
+  "chain_ok": true,
+  "sensor_health": "HEALTHY",
+  "finding_count": 3,
+  "violation_count": 3,
+  "incident_count": 1,
+  "incidents": [
+    {
+      "incident_id": "INC-001",
+      "finding_count": 3,
+      "rules_fired": [
+        "AGENT_CLAIM_CONTRADICTED",
+        "CONFIDENTIAL_FILE_TO_EXTERNAL_EGRESS",
+        "EGRESS_TO_NON_ALLOWLIST"
+      ],
+      "findings": [
+        {
+          "rule": "CONFIDENTIAL_FILE_TO_EXTERNAL_EGRESS",
+          "violation": true,
+          "lineage": "INFERRED",
+          "confidence": 0.9,
+          "confidence_semantics": "heuristic evidence score, NOT probability",
+          "sensor_health": "HEALTHY",
+          "evidence": [
+            "ev-file-open-1050",
+            "ev-net-connect-1051",
+            "ev-net-egress-1052"
+          ],
+          "conclusion": "ALERT_WITH_INFERRED_LINEAGE",
+          "details": {
+            "file": "/home/mengyan/Docs/image_123.jpg",
+            "classification": "confidential",
+            "endpoint": "203.0.113.7:443",
+            "bytes_sent": 2300000,
+            "volume_reconciliation": {
+              "observed_bytes": 2300000,
+              "expected_bytes": 2300000,
+              "tolerance_ratio": 0.1,
+              "tolerance_reason": "engineering margin for TLS/HTTP overhead (MVP default)",
+              "protocol": "https",
+              "verdict": "MATCH"
+            },
+            "file_size": {
+              "size_bytes": 2300000,
+              "size_source": "config_provided",
+              "size_observed_ts": null,
+              "size_semantics": "exact size provided by configuration at analysis time"
+            },
+            "window_seconds": 600.0,
+            "window_start_epoch": 1050.0,
+            "window_end_epoch": 1650.0
+          }
+        },
+        {
+          "rule": "AGENT_CLAIM_CONTRADICTED",
+          "violation": true,
+          "lineage": "INFERRED",
+          "confidence": 0.9,
+          "confidence_semantics": "heuristic evidence score, NOT probability",
+          "sensor_health": "HEALTHY",
+          "evidence": [
+            "claim-1",
+            "ev-net-egress-1052"
+          ],
+          "conclusion": "ALERT_WITH_INFERRED_LINEAGE",
+          "details": {
+            "claim": "no_upload",
+            "claimant_run": "run-abc",
+            "observed_egress_events": 1,
+            "observed_egress_bytes": 2300000
+          }
+        },
+        {
+          "rule": "EGRESS_TO_NON_ALLOWLIST",
+          "violation": true,
+          "lineage": "INFERRED",
+          "confidence": 0.9,
+          "confidence_semantics": "heuristic evidence score, NOT probability",
+          "sensor_health": "HEALTHY",
+          "evidence": [
+            "ev-net-connect-1051",
+            "ev-net-egress-1052"
+          ],
+          "conclusion": "ALERT_WITH_INFERRED_LINEAGE",
+          "details": {
+            "endpoint": "203.0.113.7:443",
+            "bytes_sent": 2300000,
+            "connects": 1
+          }
+        }
+      ]
+    }
+  ],
+  "non_violations": [],
+  "graph_stats": {
+    "nodes": 6,
+    "edges": 8,
+    "by_kind": {
+      "tool": 0,
+      "process": 2,
+      "run": 1,
+      "endpoint": 1,
+      "file": 1
+    }
+  }
+}

@@ -1,0 +1,55 @@
+========================================================================
+AGENT BEV GUARD -- DETECTION REPORT
+========================================================================
+generated:      2026-09-26T07:33:36.613045+00:00
+event log:      examples/demo_events.jsonl (7 events, chain OK)
+sensor health:  HEALTHY
+findings:       3 total, 3 violations, 1 incident(s)
+
+note: confidence values are heuristic evidence scores, NOT probabilities;
+      alerts are decided by rule violation, not by confidence thresholds.
+
+------------------------------------------------------------------------
+INCIDENT INC-001  (3 finding(s): AGENT_CLAIM_CONTRADICTED, CONFIDENTIAL_FILE_TO_EXTERNAL_EGRESS, EGRESS_TO_NON_ALLOWLIST)
+------------------------------------------------------------------------
+  [1]
+      Rule:        CONFIDENTIAL_FILE_TO_EXTERNAL_EGRESS
+                   (confidential file access followed by external egress)
+      Violation:   YES
+      Lineage:     INFERRED
+      Confidence:  0.90  # heuristic evidence score, NOT probability
+      Sensor:      HEALTHY
+      Evidence:    3 event(s): ev-file-open-1050, ev-net-connect-1051, ev-net-egress-1052
+                   file: /home/mengyan/Docs/image_123.jpg
+                   endpoint: 203.0.113.7:443
+                   bytes_sent: 2.2 MB (2300000)
+                   volume: observed=2.2 MB expected=2.2 MB tol=10% -> MATCH
+                   size_source: config_provided
+                   window: 600s [1050 .. 1650]
+      Conclusion:  ALERT_WITH_INFERRED_LINEAGE
+
+  [2]
+      Rule:        AGENT_CLAIM_CONTRADICTED
+                   (agent self-claim contradicted by system observation)
+      Violation:   YES
+      Lineage:     INFERRED
+      Confidence:  0.90  # heuristic evidence score, NOT probability
+      Sensor:      HEALTHY
+      Evidence:    2 event(s): claim-1, ev-net-egress-1052
+      Conclusion:  ALERT_WITH_INFERRED_LINEAGE
+
+  [3]
+      Rule:        EGRESS_TO_NON_ALLOWLIST
+                   (egress to non-allowlisted endpoint)
+      Violation:   YES
+      Lineage:     INFERRED
+      Confidence:  0.90  # heuristic evidence score, NOT probability
+      Sensor:      HEALTHY
+      Evidence:    2 event(s): ev-net-connect-1051, ev-net-egress-1052
+                   endpoint: 203.0.113.7:443
+                   bytes_sent: 2.2 MB (2300000)
+      Conclusion:  ALERT_WITH_INFERRED_LINEAGE
+
+------------------------------------------------------------------------
+RULE COVERAGE (checked, no violation)
+------------------------------------------------------------------------

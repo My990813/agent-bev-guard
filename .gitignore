@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# runtime outputs
+report_out/
+vm_out/
+*.jsonl
+!examples/demo_events.jsonl
+
+# OS
+.DS_Store

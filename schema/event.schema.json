@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent BEV Guard unified event",
+  "description": "One normalized record emitted by any sensor (kernel, gateway, or self-reported) before entering the fusion layer.",
+  "type": "object",
+  "required": ["event_id", "ts_wall", "ts_mono", "sensor", "sensor_privilege", "event_type", "actor", "action"],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {"type": "string"},
+    "ts_wall": {"type": "string", "format": "date-time"},
+    "ts_mono": {"type": "number", "minimum": 0},
+    "sensor": {
+      "enum": ["process", "file", "network", "identity", "tool_gateway", "external_service", "agent_self"]
+    },
+    "sensor_privilege": {
+      "enum": ["kernel", "system", "gateway", "external", "untrusted"]
+    },
+    "event_type": {"type": "string", "pattern": "^[a-z0-9_.]+$"},
+    "actor": {
+      "type": "object",
+      "required": ["pid"],
+      "additionalProperties": false,
+      "properties": {
+        "pid": {"type": "integer", "minimum": 1},
+        "pid_start_ts": {"type": ["number", "null"]},
+        "user": {"type": ["string", "null"]},
+        "agent_run_id": {"type": ["string", "null"]},
+        "session_id": {"type": ["string", "null"]},
+        "identity_source": {"enum": ["DIRECT", "INFERRED", "UNKNOWN"]},
+        "identity_confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "client_pid": {"type": ["integer", "null"], "minimum": 1},
+        "client_pid_source": {"enum": ["observed_ppid", "client_declared", null]},
+        "client_name": {"type": ["string", "null"]},
+        "run_id_source": {"enum": ["gateway_issued", "client_declared", null]},
+        "run_id_verified": {"type": "boolean", "default": false},
+        "ppid": {"type": ["integer", "null"], "minimum": 1}
+      }
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role", "kind", "id"],
+        "additionalProperties": false,
+        "properties": {
+          "role": {"enum": ["src", "dst"]},
+          "kind": {"enum": ["file", "socket", "process", "tool", "dataset", "object"]},
+          "id": {"type": "string"},
+          "classification": {"enum": ["public", "internal", "confidential", "secret", null]}
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["verb"],
+      "additionalProperties": false,
+      "properties": {
+        "verb": {"type": "string", "pattern": "^[a-z0-9_.]+$"},
+        "bytes": {"type": "integer", "minimum": 0},
+        "outcome": {"enum": ["success", "failure", "denied"]}
+      }
+    },
+    "peer": {
+      "type": ["object", "null"],
+      "required": ["kind", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"enum": ["network_endpoint", "unix_socket", "named_pipe"]},
+        "id": {"type": "string"},
+        "sni": {"type": ["string", "null"]}
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seq": {"type": "integer", "minimum": 1},
+        "prev_hash": {"type": "string"},
+        "hash": {"type": "string"}
+      }
+    },
+    "note": {"type": ["string", "null"]},
+    "call_context": {
+      "description": "RESERVED for stateful/cumulative policy checks (R9). Not populated in MVP.",
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "session_id": {"type": ["string", "null"]},
+        "call_seq": {"type": ["integer", "null"], "minimum": 1},
+        "state_ref": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

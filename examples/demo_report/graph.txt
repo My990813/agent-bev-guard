@@ -1,0 +1,24 @@
+========================================================================
+PROVENANCE GRAPH (who touched what)
+========================================================================
+nodes: 6  edges: 8
+
+(endpoint) 203.0.113.7:443
+
+(file) /home/mengyan/Docs/image_123.jpg [confidential]
+
+(object) claim:no_upload
+
+(process) 4242
+    --read--> /home/mengyan/Docs/image_123.jpg  [file/kernel, INFERRED conf=0.90, ts=1050, ev=ev-file-open-1050]
+    --connect--> 203.0.113.7:443  [network/kernel, INFERRED conf=0.90, ts=1051, ev=ev-net-connect-1051]
+    --send--> 203.0.113.7:443  [network/kernel, INFERRED conf=0.90, ts=1052, ev=ev-net-egress-1052]
+    --claim--> claim:no_upload  [agent_self/untrusted, INFERRED conf=0.90, ts=1053, ev=claim-1]
+
+(process) 5000
+
+(run) run-abc
+    --read--> /home/mengyan/Docs/image_123.jpg  [file/kernel, INFERRED conf=0.90, ts=1050, ev=ev-file-open-1050]
+    --connect--> 203.0.113.7:443  [network/kernel, INFERRED conf=0.90, ts=1051, ev=ev-net-connect-1051]
+    --send--> 203.0.113.7:443  [network/kernel, INFERRED conf=0.90, ts=1052, ev=ev-net-egress-1052]
+    --claim--> claim:no_upload  [agent_self/untrusted, INFERRED conf=0.90, ts=1053, ev=claim-1]

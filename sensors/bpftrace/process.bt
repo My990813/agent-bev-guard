@@ -1,0 +1,14 @@
+#!/usr/bin/env bpftrace
+/* process sensor: record every execve with system-observed pid, ppid, time.
+ * Output: EXEC|pid|ppid|uid|nsecs|filename
+ * nsecs is monotonic-since-boot; the normalizer converts to wall time
+ * using btime from /proc/stat (see collect.sh).
+ * Requires a BTF-enabled kernel (any modern distro) for
+ * curtask->real_parent->tgid.
+ */
+tracepoint:syscalls:sys_enter_execve,
+tracepoint:syscalls:sys_enter_execveat
+{
+  printf("EXEC|%d|%d|%u|%u|%s\n",
+         pid, curtask->real_parent->tgid, uid, nsecs, str(args->filename));
+}

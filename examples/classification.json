@@ -1,0 +1,9 @@
+{
+  "/home/mengyan/.ssh/": "secret",
+  "/home/mengyan/.env": "secret",
+  "/home/mengyan/work/datasets/private/": "confidential",
+  "/home/mengyan/Docs/": "confidential",
+  "/home/mengyan/work/": "internal",
+  "/etc/": "internal",
+  "/tmp/": "public"
+}
